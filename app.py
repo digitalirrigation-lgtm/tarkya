@@ -1,10 +1,3 @@
-# ============================================================
-# LOCAL SQL CAREER DATA MINER – SEMANTIC SEARCH ENGINE
-# ============================================================
-# This app runs locally on your laptop.
-# No data is sent to the internet.
-# Uses sentence-transformers for semantic matching.
-# ============================================================
 
 import streamlit as st
 import pandas as pd
