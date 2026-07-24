@@ -1,0 +1,11 @@
+streamlit
+pandas
+sentence-transformers
+transformers
+torch
+python-docx
+fpdf
+language_tool_python
+requests
+beautifulsoup4
+altair
