@@ -1,0 +1,23 @@
+Subject: Application for [Job Title] – Water Resource & Irrigation Engineer
+
+Dear Hiring Manager,
+
+Your work on [specific project or mission] caught my attention. I have been building similar systems using free Python and satellite data.
+
+I hold a B.Eng. in Water Resource & Irrigation Engineering with a GPA of 3.87/4.00, ranked in the top 1% of my faculty. I have hands-on experience in Python, GIS, remote sensing, and hydrological modeling.
+
+I designed a digital irrigation decision-support system that:
+- Uses NDVI from Sentinel-2 to detect crop stress before it is visible (NDVI >0.6 healthy, 0.35-0.5 stressed, <0.25 critical)
+- Calculates evapotranspiration using FAO56 Penman-Monteith, saving water and money
+- Estimates runoff and flood risk using SCS Curve Number
+- Monitors drought using SPI and CHIRPS
+- Predicts climate changes using CMIP6
+
+I replaced expensive software (ArcGIS, QGIS, SWAT, HEC-HMS, CropWat, AquaCrop) with free Python code. I deployed 4 applications across 4 countries, reducing water waste by 50% and fuel costs by 35%.
+
+I also have leadership experience – I led a team of 4 in a remote area, collaborated with stakeholders from the UK, South Africa, Uganda, and Kenya, and trained 1000+ students in Kaizen.
+
+I am ready to contribute immediately. You can reach me at zedagim100@gmail.com or +251-924-700-390.
+
+Sincerely,
+Zedagim Tesfaye Tantu

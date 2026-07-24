@@ -1,0 +1,22 @@
+Subject: Motivation Letter – Water Resource & GeoAI Program
+
+Dear Selection Committee,
+
+I watched people lose everything to drought and be forced into dangerous migration. That experience changed me. I realized that data is not just numbers – it is survival.
+
+While working to combat human trafficking in the Somali region of Ethiopia, I interviewed over 200 victims. 95% of them gave the same answer – they left because crops died, cattle starved, and they had no way to know what was coming. They invested money in farming without any weather data or technical support.
+
+I built my digital irrigation system to give farmers and water managers the information they need. I used free Python code, open satellite data, and climate models. I replaced expensive licensed software with code that anyone can use. I made complex systems simple, clear, and easy to understand.
+
+I deployed 4 applications across 4 countries. I cut irrigation water waste by approximately 50% and fuel costs by about 35%. I built a maritime intelligence system that tracks ships in real-time, updating every 0.05 seconds. Risk is calculated, not estimated.
+
+I also have strong field experience. I led a team of 4 in a highly remote area, starting from scratch with no prior systems. I applied Kaizen and Lean Management – Mura, Muri, PDCA, QCC, TQM. I collaborated with stakeholders from the UK, South Africa, Uganda, and Kenya. I trained 1000+ students in Kaizen.
+
+I am not looking for a job where I just follow instructions. I want to solve problems, build systems, and make a real difference. I want to help people who are facing the same challenges I saw in the field – drought, food insecurity, lack of data.
+
+I am a fast learner, adaptable, and driven by purpose. I have proved that I can deliver results with zero budget and limited resources. Now imagine what I could do with real resources.
+
+I am ready to contribute my skills, experience, and passion to your program. You can reach me at zedagim100@gmail.com or +251-924-700-390.
+
+Sincerely,
+Zedagim Tesfaye Tantu
