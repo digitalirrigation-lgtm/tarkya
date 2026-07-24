@@ -1,0 +1,1 @@
+I saw your work in digital agriculture and satellite monitoring. I built a Python irrigation system using Sentinel-2 and NDVI, cutting water waste by 50%. Would be great to connect and learn more about your projects.
