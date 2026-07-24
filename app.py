@@ -94,6 +94,24 @@ def init_db():
     conn.commit()
     conn.close()
 
+def ensure_job_history_schema():
+    """Add missing columns to Job_History if they don't exist"""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("PRAGMA table_info(Job_History)")
+    columns = [col[1] for col in c.fetchall()]
+    
+    if 'deadline_date' not in columns:
+        c.execute("ALTER TABLE Job_History ADD COLUMN deadline_date TEXT")
+        print("✅ Added deadline_date column")
+    
+    if 'status' not in columns:
+        c.execute("ALTER TABLE Job_History ADD COLUMN status TEXT DEFAULT 'Saved'")
+        print("✅ Added status column")
+    
+    conn.commit()
+    conn.close()
+
 def insert_sample_data():
     """Insert your complete master profile data with codes"""
     conn = get_db()
@@ -146,6 +164,7 @@ if not os.path.exists(DB_PATH):
     insert_sample_data()
 else:
     init_db()
+    ensure_job_history_schema()  # Ensure latest schema
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM Profile_Data")
@@ -210,24 +229,17 @@ def semantic_search(job_description, model, top_k=10, prioritize_geoai=True):
 # DYNAMIC DOCUMENT GENERATORS
 # ============================================================
 def extract_job_requirements(job_description):
-    """Extract key requirements and skills from job description"""
-    words = job_description.lower().split()
-    
-    # Common technical keywords
     tech_keywords = ['python', 'gis', 'remote sensing', 'satellite', 'ndvi', 'irrigation', 
                      'water', 'hydrology', 'drought', 'climate', 'data analysis', 'machine learning',
                      'streamlit', 'api', 'geoai', 'maritime', 'ship tracking', 'haversine',
                      'fao56', 'spi', 'chirps', 'cmip6', 'sentinel']
-    
     extracted = []
     for word in tech_keywords:
         if word in job_description.lower():
             extracted.append(word)
-    
     return extracted
 
 def generate_dynamic_cv(matches, job_title, job_description):
-    """Generate a customized CV based on job description"""
     if not matches:
         return "No matching data found in your profile. Please add more data."
     
@@ -237,66 +249,57 @@ def generate_dynamic_cv(matches, job_title, job_description):
     skills = [m for m in matches if m["category_code"] in [300, 310, 311]]
     projects = [m for m in matches if m["category_code"] in [610, 611]]
     certifications = [m for m in matches if m["category_code"] == 700]
-    
-    # Extract job requirements
     job_req = extract_job_requirements(job_description)
     
     cv = []
-    
-    # Header
     if personal_info:
         cv.append("=" * 60)
         cv.append(personal_info["content"])
         cv.append("=" * 60)
     cv.append("")
     
-    # Professional Summary - Tailored to job
     cv.append("**PROFESSIONAL SUMMARY**")
-    summary = f"Water Resource and Irrigation Engineer with a GPA of 3.87/4.00. "
+    summary = "Water Resource and Irrigation Engineer with a GPA of 3.87/4.00. "
     if any(t in job_req for t in ['maritime', 'ship', 'navigation']):
         summary += "Specialized in Maritime GeoAI and real-time ship tracking using Python and satellite data. "
     if any(t in job_req for t in ['irrigation', 'agriculture', 'drought']):
         summary += "Specialized in Digital Irrigation Systems using Python, satellite data, and hydrological modeling. "
-    summary += f"Deployed 4 applications across 4 countries. Strong field experience leading teams in remote areas."
+    summary += "Deployed 4 applications across 4 countries. Strong field experience leading teams in remote areas."
     cv.append(summary)
     cv.append("")
     
-    # Education
     if education:
         cv.append("**EDUCATION**")
         cv.append(education["content"])
         cv.append("")
     
-    # Experience
     if experience:
         cv.append("**EXPERIENCE**")
         for exp in experience:
             cv.append(f"• {exp['title']}")
-            # Highlight matching parts
             content = exp['content']
             if job_req:
+                matched = False
                 for req in job_req[:3]:
                     if req in content.lower():
                         cv.append(f"  {content[:250]}...")
+                        matched = True
                         break
-                else:
+                if not matched:
                     cv.append(f"  {content[:200]}...")
             else:
                 cv.append(f"  {content[:200]}...")
         cv.append("")
     
-    # Projects - Prioritize matching ones
     cv.append("**KEY PROJECTS**")
     for proj in projects:
         cv.append(f"• {proj['title']}")
-        # Check if project matches job requirements
         if job_req and any(req in proj['content'].lower() for req in job_req):
             cv.append(f"  ✅ {proj['content'][:150]}...")
         else:
             cv.append(f"  {proj['content'][:150]}...")
     cv.append("")
     
-    # Skills
     if skills:
         cv.append("**SKILLS**")
         skill_texts = []
@@ -308,7 +311,6 @@ def generate_dynamic_cv(matches, job_title, job_description):
         cv.append("; ".join(skill_texts))
         cv.append("")
     
-    # Certifications
     if certifications:
         cv.append("**CERTIFICATIONS**")
         for cert in certifications:
@@ -317,19 +319,14 @@ def generate_dynamic_cv(matches, job_title, job_description):
     return "\n".join(cv)
 
 def generate_dynamic_cover_letter(matches, job_title, company, job_description):
-    """Generate a customized cover letter with strong hook and call to action"""
     if not matches:
         return "No matching data found in your profile. Please add more data."
     
     personal = next((m for m in matches if m["category_code"] == 100), None)
     achievements = [m for m in matches if m["category_code"] in [610, 611, 620]]
-    skills = [m for m in matches if m["category_code"] in [300, 310, 311]]
-    
     job_req = extract_job_requirements(job_description)
     
     letter = []
-    
-    # Step 1: HOOK - Attention-grabbing opening
     if achievements:
         best_ach = max(achievements[:3], key=lambda x: x.get('score', 0))
         letter.append(f"Your work on {best_ach['title']} caught my attention. I've been building similar solutions that deliver measurable results.")
@@ -337,18 +334,15 @@ def generate_dynamic_cover_letter(matches, job_title, company, job_description):
         letter.append("I am writing to express my strong interest in this opportunity.")
     letter.append("")
     
-    # Step 2: PIVOT - Connect their need to my background
     if job_req:
         letter.append(f"My background in Water Resource Engineering and GeoAI, particularly in {', '.join(job_req[:3])}, aligns with your needs.")
     else:
         letter.append("My background in Water Resource Engineering and GeoAI aligns with your needs.")
     letter.append("")
     
-    # Step 3: EVIDENCE - Specific achievements
     letter.append("**What I Have Done:**")
     for ach in achievements[:3]:
         letter.append(f"• {ach['title']}")
-        # Find matching keywords and highlight
         content = ach['content'][:200]
         if job_req:
             for req in job_req[:2]:
@@ -357,7 +351,6 @@ def generate_dynamic_cover_letter(matches, job_title, company, job_description):
         letter.append(f"  {content}...")
     letter.append("")
     
-    # Step 4: RESULTS - Quantifiable outcomes
     letter.append("**My Results:**")
     results = [
         "• Deployed 4 production applications across 4 countries",
@@ -370,7 +363,6 @@ def generate_dynamic_cover_letter(matches, job_title, company, job_description):
         letter.append(r)
     letter.append("")
     
-    # Step 5: VALUE - What I will solve
     letter.append("**How I Will Contribute:**")
     if job_req:
         value = f"I will apply my expertise in {', '.join(job_req[:3])} to "
@@ -385,7 +377,6 @@ def generate_dynamic_cover_letter(matches, job_title, company, job_description):
     letter.append(value)
     letter.append("")
     
-    # Step 6: CALL TO ACTION
     letter.append("**I am ready to discuss how I can contribute to your team.**")
     if personal:
         contact = personal["content"].split("|")
@@ -397,7 +388,6 @@ def generate_dynamic_cover_letter(matches, job_title, company, job_description):
     return "\n".join(letter)
 
 def generate_dynamic_motivation_letter(matches, program_name, job_description):
-    """Generate a customized motivation letter with personal story"""
     if not matches:
         return "No matching data found in your profile. Please add more data."
     
@@ -406,40 +396,33 @@ def generate_dynamic_motivation_letter(matches, program_name, job_description):
     achievements = [m for m in matches if m["category_code"] in [610, 611]]
     
     letter = []
-    
-    # Step 1: HOOK - Personal story
     if narrative:
         letter.append("I watched people lose everything to drought and be forced into dangerous migration.")
     else:
         letter.append("My journey in water engineering began with a simple observation: farmers need data to survive.")
     letter.append("")
     
-    # Step 2: PIVOT
     letter.append("That experience changed me. I realized that data is not just numbers – it is survival.")
     letter.append("")
     
-    # Step 3: EVIDENCE - What I built
     if narrative:
         letter.append(narrative["content"][:250] + "...")
     letter.append("")
     
-    # Step 4: RESULTS
     letter.append("I built working prototypes, deployed 4 applications across 4 countries, and achieved:")
     results = ["• 50% water savings", "• 35% fuel cost reduction", "• Early detection of crop stress"]
     for r in results:
         letter.append(r)
     letter.append("")
     
-    # Step 5: VALUE
     letter.append("I make complex technical data simple and useful. I combine technical skills with field experience.")
     if narrative and "UK" in narrative["content"]:
         letter.append("I have collaborated across cultures – UK, South Africa, Uganda, Kenya – and understand how to deliver results globally.")
     letter.append("")
     
-    # Step 6: CALL TO ACTION
     letter.append("I am ready to contribute my skills, experience, and passion to your program.")
     if personal:
-        letter.append(f"Email: zedagim100@gmail.com | Phone: +251-924-700-390")
+        letter.append("Email: zedagim100@gmail.com | Phone: +251-924-700-390")
     letter.append("")
     letter.append("I look forward to the opportunity to make a difference.")
     
@@ -489,7 +472,6 @@ def update_status(app_id, new_status):
 # ============================================================
 st.set_page_config(layout="wide", page_title="🚀 Local Career Data Miner", page_icon="🚀")
 
-# Theme
 st.markdown("""
 <style>
     .stApp {
@@ -505,53 +487,49 @@ st.markdown("""
         color: #b8860b;
         text-shadow: 0 0 8px rgba(184, 134, 11, 0.3);
     }
-    .metric-card {
-        background: rgba(255,255,255,0.7);
-        border-radius: 15px;
-        padding: 20px;
-        border: 1px solid #b8860b;
-        text-align: center;
+    .evidence-box {
+        background: rgba(255,255,255,0.8);
+        border-radius: 10px;
+        padding: 15px;
+        border-left: 4px solid #b8860b;
+        margin-bottom: 10px;
     }
 </style>
 """, unsafe_allow_html=True)
 
 st.title("🚀 Local Career Data Miner")
-st.markdown("<p class='golden-text'>Semantic Search • Dynamic Generation • Track Applications</p>", unsafe_allow_html=True)
+st.markdown("<p class='golden-text'>Semantic Search • Dynamic Generation • Auto-Save to History</p>", unsafe_allow_html=True)
 
-# ---------- SIDEBAR ----------
 st.sidebar.title("📊 Dashboard")
 st.sidebar.info("💡 Paste a job description and get customized documents instantly.")
-
 if SEMANTIC_AVAILABLE:
     st.sidebar.success("✅ Semantic search available")
 else:
     st.sidebar.warning("⚠️ Install sentence-transformers")
 
-# ---------- TABS ----------
+# ============================================================
+# TABS
+# ============================================================
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📚 Manage Data", "🎯 Apply", "📄 Export", "📝 Templates", "📅 Job History"])
 
 # ============================================================
-# TAB 1: MANAGE DATA (Existing)
+# TAB 1: MANAGE DATA (unchanged)
 # ============================================================
 with tab1:
     st.subheader("📚 Your Career Database")
-    
     conn = get_db()
     df = pd.read_sql("SELECT id, category_code, title, content, tags, date_updated FROM Profile_Data ORDER BY category_code", conn)
     conn.close()
-    
     st.dataframe(df, use_container_width=True)
     
     st.markdown("---")
     st.subheader("📊 Category Summary")
-    
     cat_counts = df.groupby('category_code').size().reset_index(name='count')
     cat_counts.columns = ['Category Code', 'Count']
     st.dataframe(cat_counts, use_container_width=True)
     
     st.markdown("---")
     st.subheader("➕ Add New Entry")
-    
     with st.form("add_entry_form"):
         col1, col2 = st.columns(2)
         with col1:
@@ -560,7 +538,6 @@ with tab1:
         with col2:
             tags = st.text_input("Tags (comma separated)")
         content = st.text_area("Content", height=150)
-        
         if st.form_submit_button("Add Entry"):
             if title and content:
                 conn = get_db()
@@ -577,16 +554,16 @@ with tab1:
                 st.warning("Title and content are required.")
 
 # ============================================================
-# TAB 2: APPLY
+# TAB 2: APPLY (with auto-save logic)
 # ============================================================
 with tab2:
     st.subheader("🎯 Paste Job or Scholarship Description")
-    st.markdown("_The AI will analyze, extract requirements, and generate tailored documents._")
+    st.markdown("_The AI will analyze, extract requirements, and generate tailored documents. Documents are automatically saved to history._")
     
     job_description = st.text_area(
         "Paste the job or scholarship description here",
         height=250,
-        placeholder="Paste the complete job description from the company website or application portal..."
+        placeholder="Paste the complete job description from the company website..."
     )
     
     col1, col2, col3 = st.columns(3)
@@ -597,7 +574,6 @@ with tab2:
     with col3:
         deadline_date = st.date_input("Application Deadline", value=datetime.now().date() + timedelta(days=30))
     
-    # Load semantic model
     model = None
     if SEMANTIC_AVAILABLE and job_description:
         model = load_semantic_model()
@@ -612,17 +588,13 @@ with tab2:
             else:
                 with st.spinner("🔍 Analyzing job description and matching your profile..."):
                     matches = semantic_search(job_description, model, top_k=10)
-                    
                     if matches:
                         st.success(f"✅ Found {len(matches)} matching items!")
-                        
-                        # Show extracted requirements
                         job_req = extract_job_requirements(job_description)
                         if job_req:
                             st.subheader("🔑 Extracted Key Requirements")
                             st.markdown(f"**Detected skills:** {', '.join(job_req)}")
                         
-                        # Display matches
                         with st.expander("📌 View Top Matches"):
                             for m in matches[:5]:
                                 score = m.get("score", 0)
@@ -630,12 +602,15 @@ with tab2:
                                 st.caption(m['content'][:200] + "...")
                                 st.divider()
                         
-                        # Store matches in session state
+                        # Store everything in session state
                         st.session_state['matches'] = matches
                         st.session_state['job_description'] = job_description
                         st.session_state['job_title'] = job_title
                         st.session_state['company_name'] = company_name
                         st.session_state['deadline_date'] = deadline_date.strftime("%Y-%m-%d")
+                        
+                        # Generate all documents automatically (but we'll give buttons to generate individually for preview)
+                        # We'll generate them on demand via buttons, and then save to history.
                     else:
                         st.warning("No matching data found in your profile.")
     
@@ -645,10 +620,10 @@ with tab2:
                 st.session_state.pop(key, None)
             st.rerun()
     
-    # If we have matches, show document generation
+    # If we have matches, show document generation buttons
     if 'matches' in st.session_state and st.session_state['matches']:
         st.subheader("📄 Generate Dynamic Documents")
-        st.markdown("_These documents are customized based on the job description._")
+        st.markdown("_Click a button to generate and automatically save that document to history._")
         
         col_gen1, col_gen2, col_gen3 = st.columns(3)
         
@@ -660,7 +635,17 @@ with tab2:
                     st.session_state.get('job_description', '')
                 )
                 st.session_state['generated_cv'] = cv
-                st.success("✅ CV generated!")
+                # Save immediately to history
+                save_application(
+                    st.session_state.get('job_title', ''),
+                    st.session_state.get('company_name', ''),
+                    st.session_state.get('job_description', ''),
+                    st.session_state.get('deadline_date', datetime.now().strftime("%Y-%m-%d")),
+                    cv,
+                    st.session_state.get('generated_cl', ''),
+                    st.session_state.get('generated_ml', '')
+                )
+                st.success("✅ CV generated and saved to history!")
         
         with col_gen2:
             if st.button("✉️ Generate Cover Letter", use_container_width=True):
@@ -671,7 +656,16 @@ with tab2:
                     st.session_state.get('job_description', '')
                 )
                 st.session_state['generated_cl'] = cl
-                st.success("✅ Cover Letter generated!")
+                save_application(
+                    st.session_state.get('job_title', ''),
+                    st.session_state.get('company_name', ''),
+                    st.session_state.get('job_description', ''),
+                    st.session_state.get('deadline_date', datetime.now().strftime("%Y-%m-%d")),
+                    st.session_state.get('generated_cv', ''),
+                    cl,
+                    st.session_state.get('generated_ml', '')
+                )
+                st.success("✅ Cover Letter generated and saved to history!")
         
         with col_gen3:
             if st.button("📨 Generate Motivation Letter", use_container_width=True):
@@ -681,19 +675,47 @@ with tab2:
                     st.session_state.get('job_description', '')
                 )
                 st.session_state['generated_ml'] = ml
-                st.success("✅ Motivation Letter generated!")
+                save_application(
+                    st.session_state.get('job_title', ''),
+                    st.session_state.get('company_name', ''),
+                    st.session_state.get('job_description', ''),
+                    st.session_state.get('deadline_date', datetime.now().strftime("%Y-%m-%d")),
+                    st.session_state.get('generated_cv', ''),
+                    st.session_state.get('generated_cl', ''),
+                    ml
+                )
+                st.success("✅ Motivation Letter generated and saved to history!")
 
 # ============================================================
-# TAB 3: EXPORT
+# TAB 3: EXPORT (with evidence display)
 # ============================================================
 with tab3:
-    st.subheader("📄 Preview and Export Documents")
+    st.subheader("📄 Preview Documents & Evidence")
     
+    # Display job description and matched evidence
+    if 'job_description' in st.session_state:
+        st.markdown("### 📋 Job Description")
+        st.text_area("Job Description", st.session_state['job_description'], height=150, key="job_desc_display")
+    
+    if 'matches' in st.session_state and st.session_state['matches']:
+        st.markdown("### 🔍 Your Matched Profile & Reasoning")
+        st.markdown("*The AI selected these pieces because they are semantically similar to the job description. Higher score means better match.*")
+        
+        # Show top matches with reasoning
+        for i, m in enumerate(st.session_state['matches'][:5]):
+            score = m.get('score', 0)
+            st.markdown(f"**Match {i+1}: {m['title']}** (Score: {score:.3f})")
+            st.markdown(f"**Content:** {m['content'][:300]}...")
+            st.caption(f"**Why used:** This matches keywords like {', '.join(extract_job_requirements(st.session_state.get('job_description',''))[:2])}")
+            st.divider()
+    
+    # Display generated documents
+    st.markdown("### 📄 Generated Documents")
     col1, col2, col3 = st.columns(3)
     
     with col1:
         if 'generated_cv' in st.session_state:
-            st.text_area("📄 CV", st.session_state['generated_cv'], height=350)
+            st.text_area("CV", st.session_state['generated_cv'], height=300, key="cv_display")
             st.download_button(
                 "⬇️ Download CV",
                 data=st.session_state['generated_cv'],
@@ -702,7 +724,7 @@ with tab3:
     
     with col2:
         if 'generated_cl' in st.session_state:
-            st.text_area("✉️ Cover Letter", st.session_state['generated_cl'], height=350)
+            st.text_area("Cover Letter", st.session_state['generated_cl'], height=300, key="cl_display")
             st.download_button(
                 "⬇️ Download Cover Letter",
                 data=st.session_state['generated_cl'],
@@ -711,43 +733,21 @@ with tab3:
     
     with col3:
         if 'generated_ml' in st.session_state:
-            st.text_area("📨 Motivation Letter", st.session_state['generated_ml'], height=350)
+            st.text_area("Motivation Letter", st.session_state['generated_ml'], height=300, key="ml_display")
             st.download_button(
                 "⬇️ Download Motivation Letter",
                 data=st.session_state['generated_ml'],
                 file_name=f"Motivation_Letter_{datetime.now().strftime('%Y%m%d')}.txt"
             )
     
-    # Save to Job History
-    if all(k in st.session_state for k in ['matches', 'job_title', 'company_name', 'job_description']):
-        st.markdown("---")
-        st.subheader("💾 Save This Application")
-        
-        col_save1, col_save2 = st.columns(2)
-        with col_save1:
-            if st.button("💾 Save to History", use_container_width=True):
-                save_application(
-                    st.session_state.get('job_title', ''),
-                    st.session_state.get('company_name', ''),
-                    st.session_state.get('job_description', ''),
-                    st.session_state.get('deadline_date', datetime.now().strftime("%Y-%m-%d")),
-                    st.session_state.get('generated_cv', ''),
-                    st.session_state.get('generated_cl', ''),
-                    st.session_state.get('generated_ml', '')
-                )
-                st.success("✅ Application saved to history!")
-        with col_save2:
-            if st.button("📅 Set Reminder", use_container_width=True):
-                st.info("⏰ Remember to apply by: " + st.session_state.get('deadline_date', 'N/A'))
+    # Removed the separate "Save to History" button because it's now auto-saved.
 
 # ============================================================
-# TAB 4: TEMPLATES
+# TAB 4: TEMPLATES (unchanged)
 # ============================================================
 with tab4:
     st.subheader("📝 Ready-to-Use Outreach Templates")
-    
     templates_dir = os.path.join(os.path.dirname(__file__), "templates")
-    
     if os.path.exists(templates_dir):
         template_files = {
             "LinkedIn Message": "linkedin.txt",
@@ -755,7 +755,6 @@ with tab4:
             "Cover Letter": "cover_letter.txt",
             "Motivation Letter": "motivation_letter.txt"
         }
-        
         for display_name, filename in template_files.items():
             file_path = os.path.join(templates_dir, filename)
             if os.path.exists(file_path):
@@ -773,39 +772,27 @@ with tab4:
                 st.warning(f"File {filename} not found.")
     else:
         st.error("❌ Templates folder not found.")
-        st.info("""
-        **To fix:**
-        1. Create a folder called `templates` in the same folder as `app.py`
-        2. Add these files: `linkedin.txt`, `email.txt`, `cover_letter.txt`, `motivation_letter.txt`
-        """)
+        st.info("Create a folder called `templates` with the .txt files.")
 
 # ============================================================
-# TAB 5: JOB HISTORY
+# TAB 5: JOB HISTORY (unchanged)
 # ============================================================
 with tab5:
     st.subheader("📅 Job Application History")
-    
     df_history = get_job_history()
-    
     if df_history.empty:
-        st.info("No applications saved yet. Go to the 'Apply' tab to generate and save your first application.")
+        st.info("No applications saved yet. Generate documents in the 'Apply' tab to auto-save.")
     else:
-        # Metrics
         total = len(df_history)
         saved = len(df_history[df_history['status'] == 'Saved'])
         applied = len(df_history[df_history['status'] == 'Applied'])
-        
         col1, col2, col3 = st.columns(3)
-        col1.metric("📌 Total Applications", total)
+        col1.metric("📌 Total", total)
         col2.metric("💾 Saved", saved)
         col3.metric("✅ Applied", applied)
-        
         st.markdown("---")
         
-        # Display history with calendar
         st.subheader("📋 All Applications")
-        
-        # Convert deadline to date for display
         if 'deadline_date' in df_history.columns:
             df_history['deadline_date'] = pd.to_datetime(df_history['deadline_date']).dt.date
             df_history['applied_date_display'] = pd.to_datetime(df_history['applied_date']).dt.strftime("%Y-%m-%d")
@@ -813,12 +800,9 @@ with tab5:
         display_cols = ['id', 'job_title', 'company_name', 'applied_date', 'deadline_date', 'status']
         st.dataframe(df_history[display_cols], use_container_width=True)
         
-        # Select application to view/delete
         selected_id = st.selectbox("Select Application ID to manage", df_history['id'].tolist())
-        
         if selected_id:
             row = df_history[df_history['id'] == selected_id].iloc[0]
-            
             with st.expander(f"📄 {row['job_title']} - {row['company_name']}", expanded=True):
                 st.write(f"**Applied Date:** {row['applied_date']}")
                 st.write(f"**Deadline:** {row['deadline_date']}")
@@ -837,22 +821,18 @@ with tab5:
                         st.text(row['generated_motivation_letter'][:500] + "...")
                 
                 st.markdown("---")
-                
                 col_action1, col_action2, col_action3 = st.columns(3)
-                
                 with col_action1:
                     new_status = st.selectbox("Update Status", ["Saved", "Applied", "Rejected", "Interview"], key=f"status_{selected_id}")
                     if st.button("Update Status", key=f"update_{selected_id}"):
                         update_status(selected_id, new_status)
                         st.success("✅ Status updated!")
                         st.rerun()
-                
                 with col_action2:
                     if st.button("🗑️ Delete Application", key=f"delete_{selected_id}"):
                         delete_application(selected_id)
                         st.success("✅ Application deleted!")
                         st.rerun()
-                
                 with col_action3:
                     if st.button("📅 Set Reminder", key=f"reminder_{selected_id}"):
                         st.info(f"⏰ Reminder set for {row['deadline_date']}")
@@ -861,4 +841,4 @@ with tab5:
 # FOOTER
 # ============================================================
 st.markdown("---")
-st.caption(f"⚡ Data stored in {DB_PATH} | Dynamic AI Generation | All processing done locally")
+st.caption(f"⚡ Data stored in {DB_PATH} | Dynamic AI Generation | Auto-save to history")
