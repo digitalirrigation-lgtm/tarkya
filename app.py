@@ -13,13 +13,10 @@ import os
 import re
 from datetime import datetime, timedelta
 import json
-import base64
-from io import BytesIO
 
 # Document generation
 try:
     from docx import Document
-    from docx.shared import Inches, Pt
     DOCX_AVAILABLE = True
 except ImportError:
     DOCX_AVAILABLE = False
@@ -65,10 +62,8 @@ def get_db():
     return sqlite3.connect(DB_PATH, check_same_thread=False)
 
 def init_db():
-    """Create database and tables if they don't exist"""
     conn = get_db()
     c = conn.cursor()
-    
     c.execute('''CREATE TABLE IF NOT EXISTS Profile_Data (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         category_code INTEGER,
@@ -77,7 +72,6 @@ def init_db():
         tags TEXT,
         date_updated TEXT
     )''')
-    
     c.execute('''CREATE TABLE IF NOT EXISTS Job_History (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         job_title TEXT,
@@ -90,71 +84,56 @@ def init_db():
         generated_cover_letter TEXT,
         generated_motivation_letter TEXT
     )''')
-    
     conn.commit()
     conn.close()
 
 def ensure_job_history_schema():
-    """Add missing columns to Job_History if they don't exist"""
     conn = get_db()
     c = conn.cursor()
     c.execute("PRAGMA table_info(Job_History)")
     columns = [col[1] for col in c.fetchall()]
-    
     if 'deadline_date' not in columns:
         c.execute("ALTER TABLE Job_History ADD COLUMN deadline_date TEXT")
-        print("✅ Added deadline_date column")
-    
     if 'status' not in columns:
         c.execute("ALTER TABLE Job_History ADD COLUMN status TEXT DEFAULT 'Saved'")
-        print("✅ Added status column")
-    
     conn.commit()
     conn.close()
 
 def insert_sample_data():
-    """Insert your complete master profile data with codes"""
     conn = get_db()
     c = conn.cursor()
-    
     c.execute("SELECT COUNT(*) FROM Profile_Data")
     if c.fetchone()[0] > 0:
         conn.close()
         return
-    
     data = [
         (100, 'Personal Information', 'ZEDAGIM TESFAYE TANTU | Jigjiga, Ethiopia | Phone: +251-924-700-390 | Email: zedagim100@gmail.com | LinkedIn: linkedin.com/in/zed10 | GitHub: digitalirrigation-lgtm.github.io/Zedagim10', 'contact, ethiopia, linkedin, github', datetime.now().isoformat()),
         (500, 'Bachelor of Engineering – Water Resource & Irrigation Engineering', 'Jigjiga University, Jigjiga, Ethiopia. Graduated: July 2022. Cumulative GPA: 3.87 out of 4.00. Rank: Top 1% of Engineering Faculty. Core Courses: GIS and Remote Sensing, Irrigation Water Management, Drip Irrigation, Sprinkler Irrigation, Irrigation Structures 1 & 2, Flood Management, Drought Management, Water Resource Planning and Management, Integrated River Basin Management, Groundwater Hydrology, Foundation Engineering, Water Supply Engineering, Water Quality Engineering, Water Well Engineering.', 'engineering, water resource, irrigation, gpa 3.87, top 1%, remote sensing, gis', datetime.now().isoformat()),
         (700, 'Kaizen / Japanese Improvement System – Full Training', 'Mastered 5S (Sort, Set, Shine, Standardize, Sustain). Muda (waste elimination). Mura (evening workload). Muri (reducing overburden). PDCA (Plan-Do-Check-Act). Kanban (visual system). JIT (Just-in-Time). Poka-yoke (mistake-proofing). QCC (Quality Control Circle). Lean Management. TQM (Total Quality Management). TPS (Toyota Production System). Jidoka (stop and fix problems). Hoshin Kanri (policy deployment). Gemba (go and see). 5 Why Analysis. Value Stream Mapping. Six Sigma. Andon System. Heijunka. Kanri.', 'kaizen, lean, tqm, quality control, japanese system, 5s, pdca', datetime.now().isoformat()),
-        (700, 'Debrief Interview Techniques – British Home Office', 'Trained to ask open, closed, and probing questions to find root causes. Used this to interview trafficking victims.', 'interview, investigation, root cause, debrief, british home office', datetime.now().isoformat()),
+        (700, 'Debrief Interview Techniques – British Home Office', 'Trained to ask open, closed, and probing questions to find root causes.', 'interview, investigation, root cause, debrief', datetime.now().isoformat()),
         (700, 'Python for Data Science – Certified', 'Certified on June 20, 2026. Proficient in Python for data analysis and machine learning.', 'python, data science, certification', datetime.now().isoformat()),
-        (700, 'Data Analysis Fundamentals – Udacity', 'Completed August 2024. Built foundational skills in analyzing and visualizing data.', 'data analysis, udacity, fundamentals', datetime.now().isoformat()),
-        (700, 'Artificial Intelligence Operations – FutureLearn', 'Academic Score: 97%. Focused on AI operational frameworks.', 'ai, operations, futurelearn, 97%', datetime.now().isoformat()),
-        (700, 'Project Management and Infrastructure Execution – Saylor.org', 'Completed July 2024. Learned execution strategies for infrastructure projects.', 'project management, infrastructure, saylor', datetime.now().isoformat()),
-        (620, 'Field Coordinator – Love Justice Ethiopia (Anti-Trafficking)', 'Location: Jigjiga, Somali Region, Ethiopia. Period: 2019 – 2022. Mapped trafficking routes in Somali region. Interviewed 200+ potential victims. Saved 500+ potential victims from dangerous migration. 95% of victims cited drought as root cause. Led a team of 4 members using Kaizen methods. Worked with stakeholders from UK, South Africa, Uganda, Kenya, Ethiopian Federal Police, Ethiopian Justice Office. Presented to Country Director, East Africa Directors, UK stakeholders. Produced daily, weekly, monthly, quarterly, yearly reports with visuals.', 'human trafficking, mapping, fieldwork, leadership, kaizen, somali, anti-trafficking, drought', datetime.now().isoformat()),
-        (610, 'Maritime GeoAI – 4D Ship Tracking & Ocean Intelligence System', 'Designed a 4D system: Latitude (X), Longitude (Y), Depth of Water (Z), Time (Present, Past, Future). Real-time ship tracking on map. Checks weather, speed, temperature, pressure. Calculates risk and predicts arrival time. Detects borders and tides automatically. Haversine formula for distance on sphere. Open Meteo API for free, real-time global weather. Updates every 0.05 seconds. Risk is calculated, not estimated.', 'maritime, geoai, ship tracking, haversine, real-time, ocean, navigation, api', datetime.now().isoformat()),
+        (700, 'Data Analysis Fundamentals – Udacity', 'Completed August 2024.', 'data analysis, udacity', datetime.now().isoformat()),
+        (700, 'Artificial Intelligence Operations – FutureLearn', 'Academic Score: 97%.', 'ai, operations, futurelearn', datetime.now().isoformat()),
+        (700, 'Project Management and Infrastructure Execution – Saylor.org', 'Completed July 2024.', 'project management, infrastructure', datetime.now().isoformat()),
+        (620, 'Field Coordinator – Love Justice Ethiopia (Anti-Trafficking)', 'Location: Jigjiga, Somali Region, Ethiopia. Period: 2019 – 2022. Mapped trafficking routes. Interviewed 200+ victims. Saved 500+ from dangerous migration. 95% cited drought as root cause. Led a team of 4 using Kaizen methods. Collaborated with UK, South Africa, Uganda, Kenya, Ethiopian Police, Justice Office. Presented to Country Director, UK stakeholders. Produced daily, weekly, monthly, yearly reports with visuals.', 'human trafficking, mapping, fieldwork, leadership, kaizen, somali, anti-trafficking, drought', datetime.now().isoformat()),
+        (610, 'Maritime GeoAI – 4D Ship Tracking & Ocean Intelligence System', 'Designed a 4D system: Latitude, Longitude, Depth, Time. Real-time tracking, weather, speed, pressure, risk calculation, arrival prediction, border/tide detection. Haversine formula for distance. Open Meteo API for live weather. Updates every 0.05 seconds. Risk is calculated, not estimated.', 'maritime, geoai, ship tracking, haversine, real-time, ocean, navigation, api', datetime.now().isoformat()),
         (610, 'Maritime – Vessel Route Optimization System', 'Calculates shortest and safest routes using weather data to avoid storms.', 'maritime, optimization, routing, vessel, safety', datetime.now().isoformat()),
-        (610, 'Maritime – Border Detection System', 'Detects when ships cross into different zones automatically.', 'maritime, border detection, zones, real-time', datetime.now().isoformat()),
-        (610, 'Maritime – Real-time Dashboard for Captains', 'All information in one place. Satellite view of ships from space.', 'maritime, dashboard, visualization, real-time', datetime.now().isoformat()),
-        (611, 'Digital Irrigation Decision-Support System', 'Built using Python, Streamlit, Sentinel-2. NDVI thresholds: >0.6 healthy, 0.35-0.5 stressed, <0.25 critical. FAO56 Penman-Monteith evapotranspiration. SCS Curve Number for runoff. SPI for drought monitoring. CHIRPS rainfall data. CMIP6 climate prediction. Replaced ArcGIS, QGIS, SWAT, HEC-HMS, CropWat, AquaCrop with free Python code. Deployed 4 apps across 4 countries. Cut water waste 50%, fuel costs 35%.', 'irrigation, agriculture, ndvi, sentinel-2, fa056, spi, chirps, cmip6, python', datetime.now().isoformat()),
-        (611, 'Smart Irrigation Scheduling System', 'Real-time soil moisture monitoring. Automated irrigation scheduling based on crop needs.', 'irrigation, scheduling, automation, soil moisture', datetime.now().isoformat()),
-        (611, 'Drought Early Warning System', 'Uses SPI and CHIRPS data to predict drought conditions before they happen.', 'drought, early warning, spi, chirps, prediction', datetime.now().isoformat()),
-        (611, 'Crop Health Monitoring Dashboard', 'NDVI-based crop health visualization. Monitors thousands of hectares at once.', 'crop health, ndvi, dashboard, monitoring', datetime.now().isoformat()),
-        (400, 'Part-Time Kaizen Trainer', 'Locations: Horana College, Universal College Jigjiga, Universal College Karebaya Branch. Period: 2021 – 2023. Trained 1000+ students in Kaizen techniques. Taught: 5S, Muda, Mura, Muri, PDCA, Kanban, JIT, Poka-yoke, QCC, Lean Management, TQM.', 'training, kaizen, capacity building, education', datetime.now().isoformat()),
-        (400, 'Academic Administration – Board Member', 'Universal College, Jigjiga. Period: 2021 – 2023. Helped establish and improve a college in remote area. Applied QCC for education standards. Applied 5S for workplace safety. Motto: "Education is a foundation for development."', 'administration, education, quality control, board member, college', datetime.now().isoformat()),
-        (300, 'General Technical Skills – Cloud & Automation', 'Streamlit Cloud Hosting. n8n Automation Engine. API Integrations. Git Version Control. Python Operations: Pandas, NumPy, Matplotlib, Scikit-Learn.', 'python, streamlit, cloud, automation, api, machine learning', datetime.now().isoformat()),
-        (310, 'Technical Skills – Maritime Specific', 'Haversine Formula. Real-time API Integration (Open Meteo). 4D Data Visualization. Border Detection Algorithms. Tide Detection Algorithms. Vessel Tracking Systems.', 'maritime, naval, api, tracking, haversine, real-time', datetime.now().isoformat()),
-        (311, 'Technical Skills – Agriculture / Hydrology Specific', 'FAO56 Penman-Monteith. SCS Curve Number. NDVI (Sentinel-2). SPI. CHIRPS. CMIP6. Drought and Flood Risk Assessment.', 'agriculture, hydrology, remote sensing, drought, irrigation, ndvi, fao56', datetime.now().isoformat()),
-        (800, 'Library Circulation Support (Night Shift)', 'Jijiga University. Period: June 2021 – June 2022. Volunteered during a staffing shortage. Supported continuous library operations during off-hours. Received official recommendation letter for reliability.', 'volunteer, library, night shift, reliability', datetime.now().isoformat()),
-        (200, 'Leadership & Management Skills', 'Kaizen / Lean Management. 5S. Muda. Mura. Muri. PDCA. QCC. TQM. Hoshin Kanri. JIT. Poka-yoke. Team Leadership. Cross-Cultural Communication (UK, South Africa, Uganda, Kenya). Stakeholder Collaboration. Project Management. Report Writing. Visual Communication. Debrief Interview Techniques.', 'leadership, management, kaizen, project management, communication, cross-cultural', datetime.now().isoformat()),
+        (610, 'Maritime – Border Detection System', 'Detects when ships cross into different zones automatically.', 'maritime, border detection, zones', datetime.now().isoformat()),
+        (610, 'Maritime – Real-time Dashboard for Captains', 'All information in one place. Satellite view of ships from space.', 'maritime, dashboard, visualization', datetime.now().isoformat()),
+        (611, 'Digital Irrigation Decision-Support System', 'Built using Python, Streamlit, Sentinel-2. NDVI thresholds: >0.6 healthy, 0.35-0.5 stressed, <0.25 critical. FAO56 Penman-Monteith evapotranspiration. SCS Curve Number for runoff. SPI for drought monitoring. CHIRPS rainfall data. CMIP6 climate prediction. Replaced ArcGIS, QGIS, SWAT, HEC-HMS, CropWat, AquaCrop with free Python. Deployed 4 apps across 4 countries. Cut water waste 50%, fuel costs 35%.', 'irrigation, agriculture, ndvi, sentinel-2, fa056, spi, chirps, cmip6, python', datetime.now().isoformat()),
+        (611, 'Smart Irrigation Scheduling System', 'Real-time soil moisture monitoring. Automated irrigation scheduling.', 'irrigation, scheduling, automation, soil moisture', datetime.now().isoformat()),
+        (611, 'Drought Early Warning System', 'Uses SPI and CHIRPS data to predict drought conditions.', 'drought, early warning, spi, chirps', datetime.now().isoformat()),
+        (611, 'Crop Health Monitoring Dashboard', 'NDVI-based crop health visualization. Monitors thousands of hectares.', 'crop health, ndvi, dashboard', datetime.now().isoformat()),
+        (400, 'Part-Time Kaizen Trainer', 'Trained 1000+ students at Horana College, Universal College Jigjiga, Karebaya Branch. Taught: 5S, Muda, Mura, Muri, PDCA, Kanban, JIT, Poka-yoke, QCC, Lean, TQM.', 'training, kaizen, capacity building', datetime.now().isoformat()),
+        (400, 'Academic Administration – Board Member', 'Universal College, Jigjiga. Helped establish college in remote area. Applied QCC for education standards. Applied 5S for workplace safety. Motto: "Education is a foundation for development."', 'administration, education, quality control, board member', datetime.now().isoformat()),
+        (300, 'General Technical Skills – Cloud & Automation', 'Streamlit Cloud Hosting, n8n, API Integrations, Git, Python: Pandas, NumPy, Matplotlib, Scikit-Learn.', 'python, streamlit, cloud, automation, api, machine learning', datetime.now().isoformat()),
+        (310, 'Technical Skills – Maritime Specific', 'Haversine Formula, Real-time API Integration (Open Meteo), 4D Data Visualization, Border/Tide Detection, Vessel Tracking.', 'maritime, naval, api, tracking, haversine', datetime.now().isoformat()),
+        (311, 'Technical Skills – Agriculture / Hydrology Specific', 'FAO56, SCS Curve Number, NDVI (Sentinel-2), SPI, CHIRPS, CMIP6, Drought/Flood Assessment.', 'agriculture, hydrology, remote sensing, drought, irrigation, ndvi, fao56', datetime.now().isoformat()),
+        (800, 'Library Circulation Support (Night Shift)', 'Jijiga University. Volunteered during staffing shortage. Supported continuous library operations. Received recommendation letter for reliability.', 'volunteer, library, night shift', datetime.now().isoformat()),
+        (200, 'Leadership & Management Skills', 'Kaizen / Lean Management, 5S, Muda, Mura, Muri, PDCA, QCC, TQM, Hoshin Kanri, JIT, Poka-yoke, Team Leadership, Cross-Cultural Communication (UK, South Africa, Uganda, Kenya), Stakeholder Collaboration, Project Management, Report Writing, Visual Communication, Debrief Interview Techniques.', 'leadership, management, kaizen, project management, communication', datetime.now().isoformat()),
     ]
-    
     for item in data:
-        c.execute(
-            "INSERT INTO Profile_Data (category_code, title, content, tags, date_updated) VALUES (?, ?, ?, ?, ?)",
-            item
-        )
-    
+        c.execute("INSERT INTO Profile_Data (category_code, title, content, tags, date_updated) VALUES (?, ?, ?, ?, ?)", item)
     conn.commit()
     conn.close()
 
@@ -164,7 +143,7 @@ if not os.path.exists(DB_PATH):
     insert_sample_data()
 else:
     init_db()
-    ensure_job_history_schema()  # Ensure latest schema
+    ensure_job_history_schema()
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM Profile_Data")
@@ -179,7 +158,7 @@ def load_semantic_model():
     if not SEMANTIC_AVAILABLE:
         return None
     try:
-        with st.spinner("🧠 Loading semantic model..."):
+        with st.spinner("🧠 Loading semantic model (first time may take a moment)..."):
             model = SentenceTransformer(MODEL_NAME)
         return model
     except Exception as e:
@@ -189,27 +168,22 @@ def load_semantic_model():
 def semantic_search(job_description, model, top_k=10, prioritize_geoai=True):
     if model is None:
         return []
-    
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT id, category_code, title, content, tags FROM Profile_Data")
     rows = cursor.fetchall()
     conn.close()
-    
     if not rows:
         return []
-    
     texts = []
     row_data = []
     for row in rows:
         combined = f"{row[2]} {row[3]} {row[4]}"
         texts.append(combined)
         row_data.append({"id": row[0], "category_code": row[1], "title": row[2], "content": row[3], "tags": row[4]})
-    
     job_embedding = model.encode(job_description, convert_to_tensor=True)
     text_embeddings = model.encode(texts, convert_to_tensor=True)
     scores = util.cos_sim(job_embedding, text_embeddings)[0]
-    
     top_results = []
     for idx in scores.argsort(descending=True):
         if len(top_results) >= top_k:
@@ -221,7 +195,6 @@ def semantic_search(job_description, model, top_k=10, prioritize_geoai=True):
             if prioritize_geoai and row["category_code"] in [300, 310, 311, 610, 611]:
                 row["score"] = score * 1.3
             top_results.append(row)
-    
     top_results.sort(key=lambda x: x["score"], reverse=True)
     return top_results
 
@@ -453,6 +426,14 @@ def get_job_history():
     conn.close()
     return df
 
+def get_latest_application():
+    conn = get_db()
+    df = pd.read_sql("SELECT * FROM Job_History ORDER BY id DESC LIMIT 1", conn)
+    conn.close()
+    if df.empty:
+        return None
+    return df.iloc[0].to_dict()
+
 def delete_application(app_id):
     conn = get_db()
     c = conn.cursor()
@@ -470,7 +451,7 @@ def update_status(app_id, new_status):
 # ============================================================
 # STREAMLIT UI
 # ============================================================
-st.set_page_config(layout="wide", page_title="🚀 Local Career Data Miner", page_icon="🚀")
+st.set_page_config(layout="wide", page_title="🚀 AI Career Data Miner", page_icon="🚀")
 
 st.markdown("""
 <style>
@@ -497,11 +478,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🚀 Local Career Data Miner")
+st.title("🚀 AI Career Data Miner")
 st.markdown("<p class='golden-text'>Semantic Search • Dynamic Generation • Auto-Save to History</p>", unsafe_allow_html=True)
 
 st.sidebar.title("📊 Dashboard")
-st.sidebar.info("💡 Paste a job description and get customized documents instantly.")
+st.sidebar.info("💡 Paste a job description, AI will extract matching profile data and generate tailored documents.")
+
 if SEMANTIC_AVAILABLE:
     st.sidebar.success("✅ Semantic search available")
 else:
@@ -513,7 +495,7 @@ else:
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📚 Manage Data", "🎯 Apply", "📄 Export", "📝 Templates", "📅 Job History"])
 
 # ============================================================
-# TAB 1: MANAGE DATA (unchanged)
+# TAB 1: MANAGE DATA
 # ============================================================
 with tab1:
     st.subheader("📚 Your Career Database")
@@ -554,11 +536,11 @@ with tab1:
                 st.warning("Title and content are required.")
 
 # ============================================================
-# TAB 2: APPLY (with auto-save logic)
+# TAB 2: APPLY
 # ============================================================
 with tab2:
     st.subheader("🎯 Paste Job or Scholarship Description")
-    st.markdown("_The AI will analyze, extract requirements, and generate tailored documents. Documents are automatically saved to history._")
+    st.markdown("_The AI will analyze, extract requirements, and generate tailored documents. After generation, documents are saved to history and cleared from this tab._")
     
     job_description = st.text_area(
         "Paste the job or scholarship description here",
@@ -580,7 +562,7 @@ with tab2:
     
     col_run, col_clear = st.columns(2)
     with col_run:
-        if st.button("🔍 Analyze & Generate", use_container_width=True):
+        if st.button("🔍 Analyze Job", use_container_width=True):
             if not job_description:
                 st.warning("Please paste a job description first.")
             elif model is None:
@@ -602,148 +584,115 @@ with tab2:
                                 st.caption(m['content'][:200] + "...")
                                 st.divider()
                         
-                        # Store everything in session state
+                        # Store matches and job info in session state
                         st.session_state['matches'] = matches
                         st.session_state['job_description'] = job_description
                         st.session_state['job_title'] = job_title
                         st.session_state['company_name'] = company_name
                         st.session_state['deadline_date'] = deadline_date.strftime("%Y-%m-%d")
-                        
-                        # Generate all documents automatically (but we'll give buttons to generate individually for preview)
-                        # We'll generate them on demand via buttons, and then save to history.
                     else:
                         st.warning("No matching data found in your profile.")
     
     with col_clear:
-        if st.button("🗑️ Clear", use_container_width=True):
+        if st.button("🗑️ Clear All", use_container_width=True):
             for key in ['matches', 'job_description', 'job_title', 'company_name', 'deadline_date']:
                 st.session_state.pop(key, None)
             st.rerun()
     
-    # If we have matches, show document generation buttons
+    # If we have matches, show "Generate & Save" button
     if 'matches' in st.session_state and st.session_state['matches']:
-        st.subheader("📄 Generate Dynamic Documents")
-        st.markdown("_Click a button to generate and automatically save that document to history._")
+        st.markdown("---")
+        st.subheader("📄 Generate & Save All Documents")
+        st.markdown("_This will generate your CV, Cover Letter, and Motivation Letter, save them to history, and clear the UI for the next job._")
         
-        col_gen1, col_gen2, col_gen3 = st.columns(3)
-        
-        with col_gen1:
-            if st.button("📝 Generate CV", use_container_width=True):
+        if st.button("🚀 Generate All & Save to History", use_container_width=True):
+            with st.spinner("🔄 Generating documents..."):
                 cv = generate_dynamic_cv(
                     st.session_state['matches'],
                     st.session_state.get('job_title', ''),
                     st.session_state.get('job_description', '')
                 )
-                st.session_state['generated_cv'] = cv
-                # Save immediately to history
-                save_application(
-                    st.session_state.get('job_title', ''),
-                    st.session_state.get('company_name', ''),
-                    st.session_state.get('job_description', ''),
-                    st.session_state.get('deadline_date', datetime.now().strftime("%Y-%m-%d")),
-                    cv,
-                    st.session_state.get('generated_cl', ''),
-                    st.session_state.get('generated_ml', '')
-                )
-                st.success("✅ CV generated and saved to history!")
-        
-        with col_gen2:
-            if st.button("✉️ Generate Cover Letter", use_container_width=True):
                 cl = generate_dynamic_cover_letter(
                     st.session_state['matches'],
                     st.session_state.get('job_title', ''),
                     st.session_state.get('company_name', ''),
                     st.session_state.get('job_description', '')
                 )
-                st.session_state['generated_cl'] = cl
-                save_application(
-                    st.session_state.get('job_title', ''),
-                    st.session_state.get('company_name', ''),
-                    st.session_state.get('job_description', ''),
-                    st.session_state.get('deadline_date', datetime.now().strftime("%Y-%m-%d")),
-                    st.session_state.get('generated_cv', ''),
-                    cl,
-                    st.session_state.get('generated_ml', '')
-                )
-                st.success("✅ Cover Letter generated and saved to history!")
-        
-        with col_gen3:
-            if st.button("📨 Generate Motivation Letter", use_container_width=True):
                 ml = generate_dynamic_motivation_letter(
                     st.session_state['matches'],
                     st.session_state.get('company_name', ''),
                     st.session_state.get('job_description', '')
                 )
-                st.session_state['generated_ml'] = ml
+                
+                # Save to history
                 save_application(
                     st.session_state.get('job_title', ''),
                     st.session_state.get('company_name', ''),
                     st.session_state.get('job_description', ''),
                     st.session_state.get('deadline_date', datetime.now().strftime("%Y-%m-%d")),
-                    st.session_state.get('generated_cv', ''),
-                    st.session_state.get('generated_cl', ''),
-                    ml
+                    cv, cl, ml
                 )
-                st.success("✅ Motivation Letter generated and saved to history!")
+                
+                # Clear session state to remove documents from UI
+                for key in ['matches', 'job_description', 'job_title', 'company_name', 'deadline_date']:
+                    st.session_state.pop(key, None)
+                
+                st.success("✅ All documents generated and saved to history! You can view them in the 'Export' or 'Job History' tabs.")
+                st.rerun()
 
 # ============================================================
-# TAB 3: EXPORT (with evidence display)
+# TAB 3: EXPORT
 # ============================================================
 with tab3:
-    st.subheader("📄 Preview Documents & Evidence")
+    st.subheader("📄 Preview & Download Saved Documents")
     
-    # Display job description and matched evidence
-    if 'job_description' in st.session_state:
-        st.markdown("### 📋 Job Description")
-        st.text_area("Job Description", st.session_state['job_description'], height=150, key="job_desc_display")
+    # Get latest application from history
+    latest = get_latest_application()
     
-    if 'matches' in st.session_state and st.session_state['matches']:
-        st.markdown("### 🔍 Your Matched Profile & Reasoning")
-        st.markdown("*The AI selected these pieces because they are semantically similar to the job description. Higher score means better match.*")
+    if latest is None:
+        st.info("No saved applications found. Generate documents in the 'Apply' tab first.")
+    else:
+        st.markdown(f"### 📌 Latest Application: {latest['job_title']} - {latest['company_name']}")
+        st.write(f"**Applied Date:** {latest['applied_date']}")
+        st.write(f"**Deadline:** {latest['deadline_date']}")
+        st.write(f"**Status:** {latest['status']}")
         
-        # Show top matches with reasoning
-        for i, m in enumerate(st.session_state['matches'][:5]):
-            score = m.get('score', 0)
-            st.markdown(f"**Match {i+1}: {m['title']}** (Score: {score:.3f})")
-            st.markdown(f"**Content:** {m['content'][:300]}...")
-            st.caption(f"**Why used:** This matches keywords like {', '.join(extract_job_requirements(st.session_state.get('job_description',''))[:2])}")
-            st.divider()
-    
-    # Display generated documents
-    st.markdown("### 📄 Generated Documents")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if 'generated_cv' in st.session_state:
-            st.text_area("CV", st.session_state['generated_cv'], height=300, key="cv_display")
-            st.download_button(
-                "⬇️ Download CV",
-                data=st.session_state['generated_cv'],
-                file_name=f"CV_{datetime.now().strftime('%Y%m%d')}.txt"
-            )
-    
-    with col2:
-        if 'generated_cl' in st.session_state:
-            st.text_area("Cover Letter", st.session_state['generated_cl'], height=300, key="cl_display")
-            st.download_button(
-                "⬇️ Download Cover Letter",
-                data=st.session_state['generated_cl'],
-                file_name=f"Cover_Letter_{datetime.now().strftime('%Y%m%d')}.txt"
-            )
-    
-    with col3:
-        if 'generated_ml' in st.session_state:
-            st.text_area("Motivation Letter", st.session_state['generated_ml'], height=300, key="ml_display")
-            st.download_button(
-                "⬇️ Download Motivation Letter",
-                data=st.session_state['generated_ml'],
-                file_name=f"Motivation_Letter_{datetime.now().strftime('%Y%m%d')}.txt"
-            )
-    
-    # Removed the separate "Save to History" button because it's now auto-saved.
+        st.markdown("---")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if latest['generated_cv']:
+                st.text_area("📄 CV", latest['generated_cv'], height=300, key="cv_export")
+                st.download_button(
+                    "⬇️ Download CV",
+                    data=latest['generated_cv'],
+                    file_name=f"CV_{latest['job_title']}_{datetime.now().strftime('%Y%m%d')}.txt"
+                )
+        
+        with col2:
+            if latest['generated_cover_letter']:
+                st.text_area("✉️ Cover Letter", latest['generated_cover_letter'], height=300, key="cl_export")
+                st.download_button(
+                    "⬇️ Download Cover Letter",
+                    data=latest['generated_cover_letter'],
+                    file_name=f"Cover_Letter_{latest['job_title']}_{datetime.now().strftime('%Y%m%d')}.txt"
+                )
+        
+        with col3:
+            if latest['generated_motivation_letter']:
+                st.text_area("📨 Motivation Letter", latest['generated_motivation_letter'], height=300, key="ml_export")
+                st.download_button(
+                    "⬇️ Download Motivation Letter",
+                    data=latest['generated_motivation_letter'],
+                    file_name=f"Motivation_Letter_{latest['job_title']}_{datetime.now().strftime('%Y%m%d')}.txt"
+                )
+        
+        st.markdown("---")
+        st.info("💡 To view previous applications, go to the 'Job History' tab.")
 
 # ============================================================
-# TAB 4: TEMPLATES (unchanged)
+# TAB 4: TEMPLATES
 # ============================================================
 with tab4:
     st.subheader("📝 Ready-to-Use Outreach Templates")
@@ -775,13 +724,13 @@ with tab4:
         st.info("Create a folder called `templates` with the .txt files.")
 
 # ============================================================
-# TAB 5: JOB HISTORY (unchanged)
+# TAB 5: JOB HISTORY
 # ============================================================
 with tab5:
     st.subheader("📅 Job Application History")
     df_history = get_job_history()
     if df_history.empty:
-        st.info("No applications saved yet. Generate documents in the 'Apply' tab to auto-save.")
+        st.info("No applications saved yet. Generate documents in the 'Apply' tab.")
     else:
         total = len(df_history)
         saved = len(df_history[df_history['status'] == 'Saved'])
